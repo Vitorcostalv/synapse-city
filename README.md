@@ -9,7 +9,7 @@ SYNAPSE CITY is designed for two audiences at once: visitors can explore a cinem
 ## Live services
 
 - Frontend: https://synapse-city-taupe.vercel.app
-- API: deployment URL is written here after Render validation.
+- API: https://synapse-city-api.onrender.com
 - Technical brief: `/technical` on the frontend deployment.
 
 ![SYNAPSE CITY desktop laboratory](docs/screenshots/lab-desktop.png)
@@ -30,6 +30,7 @@ SYNAPSE CITY is designed for two audiences at once: visitors can explore a cinem
 - Procedural React Three Fiber city with adaptive quality and touch camera controls.
 - Mobile-specific bottom laboratory drawer and safe-area-aware controls.
 - FastAPI health/session gateway with validation, isolation, TTLs, CORS, rate limiting, and WebSocket heartbeat.
+- Non-blocking gateway status telemetry in the frontend; Local Lab remains usable during Render cold starts or outages.
 - CI for lint, type checking, engine tests, frontend build, and API tests.
 
 ## What is algorithm, heuristic, and visualization

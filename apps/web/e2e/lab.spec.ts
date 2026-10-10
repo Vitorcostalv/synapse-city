@@ -52,6 +52,13 @@ test("evidence panel renders live metrics", async ({ page }) => {
   await expect(page.locator(".recharts-responsive-container")).toBeVisible();
 });
 
+test("configured gateway health is surfaced without owning the simulation", async ({ page }) => {
+  test.skip(process.env.PLAYWRIGHT_EXPECT_GATEWAY !== "true", "Only runs against a deployment with the optional gateway configured");
+  await page.goto("/");
+  await expect(page.locator(".gateway-status")).toHaveAttribute("data-state", "online", { timeout: 25_000 });
+  await expect(page.getByText("Browser-resident engine")).toBeVisible();
+});
+
 test("technical brief explains the actual algorithm", async ({ page }) => {
   await page.goto("/technical");
   await expect(page.getByRole("heading", { name: /A small algorithm/ })).toBeVisible();

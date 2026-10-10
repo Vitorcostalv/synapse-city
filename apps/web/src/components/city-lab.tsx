@@ -18,6 +18,7 @@ const EXPERIMENTS: { id: ExperimentKind; label: string; note: string }[] = [
 ];
 
 type WorkerMessage = { type: "snapshot"; snapshot: WorldSnapshot } | { type: "evaluation"; results: EvaluationResult[]; durationMs: number };
+type GatewayStatus = "checking" | "online" | "offline";
 
 function Meter({ label, value, inverse = false }: { label: string; value: number; inverse?: boolean }) {
   const normalized = inverse ? 100 - value : value;
@@ -56,6 +57,7 @@ export function CityLab() {
   const [evaluating, setEvaluating] = useState(false);
   const [quality, setQuality] = useState<"low"|"high">("high");
   const [notice, setNotice] = useState("Local engine ready");
+  const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>(() => process.env.NEXT_PUBLIC_API_URL ? "checking" : "offline");
 
   useEffect(() => {
     const qualityFrame = requestAnimationFrame(() => {
@@ -69,6 +71,18 @@ export function CityLab() {
     };
     worker.onerror = () => setNotice("Worker interrupted — reload to restart the local engine");
     return () => { cancelAnimationFrame(qualityFrame); worker.terminate(); };
+  }, []);
+
+  useEffect(() => {
+    const gatewayUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!gatewayUrl) return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20_000);
+    fetch(`${gatewayUrl}/health`, { signal: controller.signal })
+      .then((response) => { setGatewayStatus(response.ok ? "online" : "offline"); })
+      .catch(() => { setGatewayStatus("offline"); })
+      .finally(() => window.clearTimeout(timeout));
+    return () => { window.clearTimeout(timeout); controller.abort(); };
   }, []);
 
   const send = useCallback((message: object) => workerRef.current?.postMessage(message), []);
@@ -116,7 +130,7 @@ export function CityLab() {
 
     <header className="topbar">
       <div className="brand"><div className="brand-glyph"><i/><i/><i/></div><div><strong>SYNAPSE CITY</strong><span>Artificial society laboratory</span></div></div>
-      <div className="top-status"><span className="live-badge"><i/> LOCAL LAB</span><span>SEED {snapshot.seed}</span><span>DAY {metrics.day} · {String(metrics.hour).padStart(2,"0")}:00</span><Link href="/technical">TECHNICAL BRIEF <BookOpen size={13}/></Link></div>
+      <div className="top-status"><span className="live-badge"><i/> LOCAL LAB</span><span className="gateway-status" data-state={gatewayStatus}><i/> GATEWAY {gatewayStatus}</span><span>SEED {snapshot.seed}</span><span>DAY {metrics.day} · {String(metrics.hour).padStart(2,"0")}:00</span><Link href="/technical">TECHNICAL BRIEF <BookOpen size={13}/></Link></div>
     </header>
 
     <aside className="metric-rail" aria-label="Live city metrics">
