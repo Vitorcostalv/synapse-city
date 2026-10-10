@@ -8,7 +8,7 @@ SYNAPSE CITY is designed for two audiences at once: visitors can explore a cinem
 
 ## Live services
 
-- Frontend: deployment URL is written here after production validation.
+- Frontend: https://synapse-city-taupe.vercel.app
 - API: deployment URL is written here after Render validation.
 - Technical brief: `/technical` on the frontend deployment.
 

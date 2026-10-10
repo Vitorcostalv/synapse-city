@@ -13,4 +13,4 @@ services:
       - key: MAX_SESSIONS
         value: 24
       - key: ALLOWED_ORIGINS
-        value: https://synapse-city.vercel.app
+        value: https://synapse-city-taupe.vercel.app

@@ -55,4 +55,4 @@ jobs:
           cache: pip
           cache-dependency-path: services/simulation-api/requirements.txt
       - run: pip install -r requirements.txt
-      - run: pytest tests -q
+      - run: python -m pytest tests -q
