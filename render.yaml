@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: synapse-city-api
+    runtime: python
+    plan: free
+    rootDir: services/simulation-api
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: MAX_SESSIONS
+        value: 24
+      - key: ALLOWED_ORIGINS
+        value: https://synapse-city.vercel.app
