@@ -27,6 +27,31 @@ test("controlled experiment writes an audit event", async ({ page }) => {
   await expect(page.getByText(/scarcity scenario activated/i)).toBeVisible();
 });
 
+test("browser checkpoint survives a page refresh", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Pause simulation" }).click();
+  await page.getByRole("button", { name: "Experiments" }).click();
+  await page.getByRole("button", { name: "Save checkpoint" }).click();
+  const savedTick = await page.evaluate(() => {
+    const saved = localStorage.getItem("synapse-city-snapshot");
+    return saved ? (JSON.parse(saved) as { tick: number }).tick : null;
+  });
+  expect(savedTick).not.toBeNull();
+  await page.reload();
+  await page.getByRole("button", { name: "Pause simulation" }).click();
+  await page.getByRole("button", { name: "Experiments" }).click();
+  await page.getByRole("button", { name: "Load checkpoint" }).click();
+  await expect(page.locator(".tick-readout b")).toHaveText(savedTick!.toLocaleString());
+});
+
+test("evidence panel renders live metrics", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Evidence" }).click();
+  await expect(page.getByRole("heading", { name: "Measured, not narrated." })).toBeVisible();
+  await expect(page.getByText("Live satisfaction")).toBeVisible();
+  await expect(page.locator(".recharts-responsive-container")).toBeVisible();
+});
+
 test("technical brief explains the actual algorithm", async ({ page }) => {
   await page.goto("/technical");
   await expect(page.getByRole("heading", { name: /A small algorithm/ })).toBeVisible();
