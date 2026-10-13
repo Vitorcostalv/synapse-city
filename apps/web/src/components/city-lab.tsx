@@ -3,13 +3,14 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Agent, EvaluationResult, ExperimentKind, PolicyKind, WorldSnapshot } from "@synapse/simulation";
-import { Activity, BookOpen, ChevronDown, CirclePause, CirclePlay, Download, FlaskConical, Gauge, RotateCcw, Save, SkipForward, Upload, Users, WifiOff, X } from "lucide-react";
-import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Activity, BookOpen, ChevronDown, CirclePause, CirclePlay, Coins, Download, FlaskConical, Gauge, HeartHandshake, RotateCcw, Save, ShieldPlus, SkipForward, Sparkles, Upload, Users, WifiOff, X } from "lucide-react";
+import { ChangeEvent, CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MetricChart } from "./metric-chart";
 
 const CityScene = dynamic(() => import("./city-scene").then((module) => module.CityScene), { ssr: false, loading: () => <div className="scene-loading"><span />Constructing urban model</div> });
 
 const ACTION_LABELS: Record<string, string> = { work: "Working", eat: "Eating", rest: "Resting", study: "Studying", socialize: "Socializing", explore: "Exploring" };
+const PROFILE_COLORS: Record<string, string> = { Disciplined: "#55d8df", Social: "#f0c45d", Curious: "#a8dd7f", Cautious: "#78a9e6", Economic: "#df9a57", Student: "#b598e8", Merchant: "#e78370", Explorer: "#72d6b3" };
 const EXPERIMENTS: { id: ExperimentKind; label: string; note: string }[] = [
   { id: "scarcity", label: "Food scarcity", note: "Reduce market stock to 18%." },
   { id: "unemployment", label: "Labor contraction", note: "Remove one third of jobs." },
@@ -25,14 +26,22 @@ function Meter({ label, value, inverse = false }: { label: string; value: number
   return <div className="meter-row"><span>{label}</span><div className="meter"><i style={{ width: `${Math.max(2, normalized)}%` }} /></div><b>{Math.round(value)}</b></div>;
 }
 
-function AgentInspector({ agent, onClose }: { agent: Agent; onClose: () => void }) {
+function AgentPortrait({ agent }: { agent: Agent }) {
+  return <div className="agent-portrait" style={{ "--agent-color": PROFILE_COLORS[agent.profile] ?? "#66d9df" } as CSSProperties}><span>{agent.name.split(" ").map((part) => part[0]).join("").slice(0,2)}</span><i/><b>{agent.profile}</b></div>;
+}
+
+function AgentInspector({ agent, population, onClose }: { agent: Agent; population: Agent[]; onClose: () => void }) {
   const qEntries = Object.entries(agent.trace.qValues).sort((a,b) => b[1] - a[1]);
+  const strongestRelationship = Object.entries(agent.relationships).sort((a,b) => b[1] - a[1])[0];
+  const closestCitizen = population.find((citizen) => citizen.id === strongestRelationship?.[0]);
   return <section className="inspector" aria-label={`Inspector for ${agent.name}`}>
-    <header className="inspector-head"><div><span className="eyebrow">Citizen trace · {agent.id}</span><h2>{agent.name}</h2><p>{agent.profession} / {agent.profile}</p></div><button className="icon-button" onClick={onClose} aria-label="Close inspector"><X size={16}/></button></header>
+    <header className="inspector-head"><AgentPortrait agent={agent}/><div className="agent-heading"><span className="eyebrow">Citizen trace · {agent.id}</span><h2>{agent.name}</h2><p>{agent.age} years · {agent.profession}</p></div><button className="icon-button" onClick={onClose} aria-label="Close inspector"><X size={16}/></button></header>
     <div className="agent-status"><span className="pulse-dot" /><b>{ACTION_LABELS[agent.action]}</b><small>Reward {agent.trace.reward >= 0 ? "+" : ""}{agent.trace.reward.toFixed(2)}</small></div>
+    <div className="identity-stats"><div><Coins/><span>Credits</span><b>{agent.money.toFixed(0)}</b></div><div><ShieldPlus/><span>Health</span><b>{agent.health.toFixed(0)}</b></div><div><Sparkles/><span>Curiosity</span><b>{agent.curiosity.toFixed(0)}</b></div><div><HeartHandshake/><span>Connections</span><b>{Object.keys(agent.relationships).length}</b></div></div>
     <div className="needs-grid">
       <Meter label="Energy" value={agent.needs.energy}/><Meter label="Hunger" value={agent.needs.hunger} inverse/><Meter label="Social" value={agent.needs.social} inverse/><Meter label="Growth" value={agent.needs.growth} inverse/>
     </div>
+    <div className="social-signature"><div className="section-label"><span>Social signature</span><span>{agent.sociability.toFixed(0)} sociability</span></div>{closestCitizen ? <p><span>Strongest tie</span><b>{closestCitizen.name}</b><em>{strongestRelationship[1].toFixed(1)}</em></p> : <p className="no-connections">No established relationships yet</p>}</div>
     <div className="trace-block"><span className="eyebrow">Decision trace</span><dl>
       <div><dt>Observed state</dt><dd>{agent.trace.state}</dd></div>
       <div><dt>Valid actions</dt><dd>{agent.trace.validActions.join(" · ")}</dd></div>
@@ -150,7 +159,7 @@ export function CityLab() {
         <button className={panel === "data" ? "active" : ""} onClick={() => setPanel("data")}>Evidence</button>
       </nav>
       <div className="panel-scroll">
-        {panel === "citizen" && (selected ? <AgentInspector agent={selected} onClose={() => setSelectedId(undefined)}/> : <div className="empty-panel"><div className="target-reticle"><i/><i/></div><span className="eyebrow">Explore a living city</span><h2>Select a citizen</h2><p>Tap any moving citizen to inspect the exact state, valid actions, utilities, learned Q-values and observed reward behind the latest decision.</p><button onClick={() => selectAgent(snapshot.agents[0].id)}>Inspect citizen 001</button></div>)}
+        {panel === "citizen" && (selected ? <AgentInspector agent={selected} population={snapshot.agents} onClose={() => setSelectedId(undefined)}/> : <div className="empty-panel"><div className="target-reticle"><i/><i/></div><span className="eyebrow">Explore a living city</span><h2>Every citizen has a story.</h2><p>Each resident has a persistent profile, profession, appearance, memory and social graph. Select someone in the city or open a live trace below.</p><button onClick={() => selectAgent(snapshot.agents[0].id)}>Inspect citizen 001</button><div className="citizen-roster"><div className="section-label"><span>Live population</span><span>{snapshot.agents.length} citizens</span></div>{snapshot.agents.slice(0,8).map((agent)=><button key={agent.id} onClick={()=>selectAgent(agent.id)}><i style={{background:PROFILE_COLORS[agent.profile]}}/><span><b>{agent.name}</b><small>{agent.profession}</small></span><em>{ACTION_LABELS[agent.action]}</em></button>)}</div></div>)}
         {panel === "lab" && <div className="lab-panel"><span className="eyebrow">Controlled interventions</span><h2>Disturb the system.</h2><p>Each scenario changes an explicit environmental variable. Outcomes come from subsequent simulation ticks.</p><div className="experiment-list">{EXPERIMENTS.map((experiment) => <button key={experiment.id} className={snapshot.experiment === experiment.id ? "active" : ""} onClick={() => runExperiment(experiment.id)}><FlaskConical size={16}/><span><b>{experiment.label}</b><small>{experiment.note}</small></span><i/></button>)}</div><button className="text-button" onClick={() => runExperiment("none")}>Restore control conditions</button><div className="checkpoint-actions"><button onClick={saveLocal}><Save size={14}/>Save checkpoint</button><button onClick={restoreLocal}><RotateCcw size={14}/>Load checkpoint</button></div><div className="event-log"><div className="section-label"><span>Audit log</span><span>{snapshot.events.length}</span></div>{snapshot.events.slice(0,6).map((event) => <p key={event.id}><b>T{event.tick}</b><span>{event.message}</span></p>)}</div></div>}
         {panel === "data" && <div className="data-panel"><span className="eyebrow">Inside the intelligence</span><h2>Measured, not narrated.</h2><p>Evaluation runs identical seeds for valid-random, heuristic and trainable policies in the same headless engine.</p><button className="primary-action" disabled={evaluating} onClick={evaluate}>{evaluating ? "Running 12 episodes…" : "Run policy evaluation"}</button>{evaluation && <div className="evaluation-table"><div><span>Policy</span><span>Satisfaction</span><span>Reward</span></div>{evaluation.map((row) => <div key={row.policy} className={row.policy === "q-learning" ? "learned" : ""}><b>{row.policy}</b><span>{row.satisfaction}</span><span>{row.averageReward}</span></div>)}</div>}<div className="chart-card"><div className="section-label"><span>Live satisfaction</span><span>{snapshot.history.length} samples</span></div><MetricChart data={snapshot.history}/></div><div className="method-note"><b>Evaluation protocol</b><p>4 held-out seeds × 420 ticks. Exploration is disabled for baselines and decays for Q-learning. No display data is randomized.</p></div></div>}
       </div>

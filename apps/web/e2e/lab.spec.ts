@@ -8,7 +8,8 @@ test("local city runs and exposes a real decision trace", async ({ page }, testI
   await expect(page.getByText("Browser-resident engine")).toBeVisible();
   await expect(page.locator(".scene-loading")).toBeHidden({ timeout: 15_000 });
   await expect(page.locator("canvas")).toBeVisible();
-  await page.waitForTimeout(700);
+  // Let the larger procedural scene finish its first shader/material pass before documentation capture.
+  await page.waitForTimeout(3_000);
   await page.getByRole("button", { name: "Inspect citizen 001" }).click();
   await expect(page.getByText("Decision trace")).toBeVisible();
   await expect(page.getByText("Learned action values")).toBeVisible();
