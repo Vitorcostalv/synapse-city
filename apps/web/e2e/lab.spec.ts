@@ -53,6 +53,24 @@ test("evidence panel renders live metrics", async ({ page }) => {
   await expect(page.locator(".recharts-responsive-container")).toBeVisible();
 });
 
+test("3D scene survives sustained simulation and citizen selection", async ({ page }) => {
+  test.slow();
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+  await page.goto("/");
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "5×" }).click();
+  await page.waitForTimeout(15_000);
+  await page.getByRole("button", { name: "Inspect citizen 001" }).click();
+  await page.waitForTimeout(1_000);
+  const contextLost = await page.locator("canvas").evaluate((canvas) => {
+    const gl = (canvas as HTMLCanvasElement).getContext("webgl2");
+    return !gl || gl.isContextLost();
+  });
+  expect(contextLost).toBe(false);
+  expect(consoleErrors.filter((error) => !error.includes("favicon"))).toEqual([]);
+});
+
 test("configured gateway health is surfaced without owning the simulation", async ({ page }) => {
   test.skip(process.env.PLAYWRIGHT_EXPECT_GATEWAY !== "true", "Only runs against a deployment with the optional gateway configured");
   await page.goto("/");
