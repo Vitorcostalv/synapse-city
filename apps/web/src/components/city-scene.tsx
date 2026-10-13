@@ -1,12 +1,13 @@
 "use client";
 
-import { Environment, Html, Line, MapControls, OrthographicCamera, Sparkles, Stars } from "@react-three/drei";
-import { Canvas, ThreeEvent, useFrame } from "@react-three/fiber";
+import { Environment, Html, Line, MapControls, OrthographicCamera, PerspectiveCamera, Sparkles, Stars } from "@react-three/drei";
+import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { Action, Agent, WorldSnapshot } from "@synapse/simulation";
-import { memo, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
-type Props = { snapshot: WorldSnapshot; selectedId?: string; onSelect: (id: string) => void; quality: "low" | "high" };
+export type CinematicShot = "opening" | "world-a" | "world-b" | "decision" | "learning" | "benchmark" | "closing";
+type Props = { snapshot: WorldSnapshot; selectedId?: string; onSelect: (id: string) => void; quality: "low" | "high"; cinematic?: { shot: CinematicShot; take: number } };
 type Building = { x: number; z: number; w: number; h: number; d: number; color: string; accent: string; kind: "tower" | "block" | "market" | "campus" };
 
 const BUILDINGS: Building[] = [
@@ -107,11 +108,58 @@ function Citizens({ agents, selectedId, onSelect, quality }: { agents: Agent[]; 
 
 function DistrictLabels(){return <>{[["MAKER WARD",-15,-21],["CIVIC CORE",0,-21],["MARKET ROW",15,-21],["COMMONS",-15,21],["LEARNING DISTRICT",8,21],["SKYLINE",17,21]].map(([label,x,z])=><Html key={label as string} position={[x as number,.08,z as number]} rotation={[-Math.PI/2,0,0]} center transform distanceFactor={18}><span className="district-label">{label}</span></Html>)}</>}
 
-function Scene({ snapshot, selectedId, onSelect, quality }: Props) {
+function CinematicCamera({ shot, take, focus }: { shot: CinematicShot; take: number; focus?: Agent }) {
+  const { camera } = useThree();
+  const startedAt = useRef<number | undefined>(undefined);
+  const position = useMemo(() => new THREE.Vector3(), []);
+  const target = useMemo(() => new THREE.Vector3(), []);
+  useEffect(() => { startedAt.current = undefined; }, [take, shot]);
+  useFrame(({ clock }) => {
+    if (startedAt.current === undefined) startedAt.current = clock.elapsedTime;
+    const elapsed = clock.elapsedTime - startedAt.current;
+    const fx = focus?.position.x ?? 0;
+    const fz = focus?.position.z ?? 0;
+    if (shot === "opening") {
+      const angle = .72 - elapsed * .1;
+      position.set(Math.cos(angle) * 34, 20 - elapsed * .35, Math.sin(angle) * 34);
+      target.set(0, 2.5, 0);
+    } else if (shot === "world-a") {
+      const angle = 2.5 + elapsed * .16;
+      position.set(Math.cos(angle) * 24, 11.5, Math.sin(angle) * 24);
+      target.set(-3, 1.7, 1);
+    } else if (shot === "world-b") {
+      position.set(18 - elapsed * 1.15, 7.2, -15 + elapsed * .42);
+      target.set(2 + elapsed * .35, 1.25, -2);
+    } else if (shot === "decision") {
+      const angle = .95 + elapsed * .07;
+      position.set(fx + Math.cos(angle) * 11, 6.2, fz + Math.sin(angle) * 11);
+      target.set(fx, .75, fz);
+    } else if (shot === "learning") {
+      const angle = 3.7 - elapsed * .18;
+      position.set(fx + Math.cos(angle) * 15, 8.5, fz + Math.sin(angle) * 15);
+      target.set(fx, 1, fz);
+    } else if (shot === "benchmark") {
+      const angle = 1.25 + elapsed * .035;
+      position.set(Math.cos(angle) * 30, 16, Math.sin(angle) * 30);
+      target.set(0, 2, 0);
+    } else {
+      const angle = 2.25 - elapsed * .11;
+      position.set(Math.cos(angle) * (29 - elapsed * .45), 16 - elapsed * .3, Math.sin(angle) * (29 - elapsed * .45));
+      target.set(0, 2.4, 0);
+    }
+    camera.position.lerp(position, .14);
+    camera.lookAt(target);
+  });
+  // Remounting for each take resets both the R3F clock offset and the camera path.
+  return <PerspectiveCamera key={`${shot}-${take}`} makeDefault position={[31, 20, 31]} fov={shot === "decision" ? 37 : 42} near={.1} far={160}/>;
+}
+
+function Scene({ snapshot, selectedId, onSelect, quality, cinematic }: Props) {
   const sun=(snapshot.metrics.hour/24)*Math.PI*2; const daylight=Math.max(.12,Math.sin(sun-Math.PI/2)*.55+.55);
+  const focus = snapshot.agents.find((agent) => agent.id === selectedId);
   return <><color attach="background" args={[daylight<.3?"#071c24":"#0b2830"]}/><fog attach="fog" args={[daylight<.3?"#091e26":"#0b2830",30,70]}/><ambientLight intensity={.62+daylight*.58} color="#c2e9e1"/><hemisphereLight args={["#a9e0df","#173337",.62+daylight*.32]}/><directionalLight position={[15,24,9]} intensity={.9+daylight*1.45} color={daylight<.35?"#80b8d3":"#ffe0a1"} castShadow={quality==="high"} shadow-mapSize={[1024,1024]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25}/>
-    <RoadsAndGround/><group>{BUILDINGS.map((building,index)=><BuildingModel key={`${building.x}-${building.z}`} building={building} index={index} daylight={daylight}/>)}</group><Citizens agents={snapshot.agents} selectedId={selectedId} onSelect={onSelect} quality={quality}/>{quality==="high"&&<DistrictLabels/>}{quality==="high"&&daylight<.4&&<><Stars radius={60} depth={25} count={600} factor={2} fade speed={.15}/><Sparkles count={45} scale={[42,8,42]} size={1.2} speed={.12} opacity={.25} color="#78dce1"/></>}
-    <OrthographicCamera makeDefault position={[31,32,31]} zoom={quality==="low"?27:31}/><MapControls makeDefault enableDamping dampingFactor={.07} enablePan={false} minZoom={18} maxZoom={72} maxPolarAngle={Math.PI/2.12} minPolarAngle={.45} mouseButtons={{LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.ROTATE}} touches={{ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_ROTATE}}/>{quality==="high"&&<Environment preset="city" environmentIntensity={.18}/>}</>;
+    <RoadsAndGround/><group>{BUILDINGS.map((building,index)=><BuildingModel key={`${building.x}-${building.z}`} building={building} index={index} daylight={daylight}/>)}</group><Citizens agents={snapshot.agents} selectedId={selectedId} onSelect={onSelect} quality={quality}/>{quality==="high"&&!cinematic&&<DistrictLabels/>}{quality==="high"&&daylight<.4&&<><Stars radius={60} depth={25} count={600} factor={2} fade speed={.15}/><Sparkles count={45} scale={[42,8,42]} size={1.2} speed={.12} opacity={.25} color="#78dce1"/></>}
+    {cinematic ? <CinematicCamera shot={cinematic.shot} take={cinematic.take} focus={focus}/> : <><OrthographicCamera makeDefault position={[31,32,31]} zoom={quality==="low"?27:31}/><MapControls makeDefault enableDamping dampingFactor={.07} enablePan={false} minZoom={18} maxZoom={72} maxPolarAngle={Math.PI/2.12} minPolarAngle={.45} mouseButtons={{LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.ROTATE}} touches={{ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_ROTATE}}/></>}{quality==="high"&&<Environment preset="city" environmentIntensity={.18}/>}</>;
 }
 
 export const CityScene=memo(function CityScene(props:Props){return <Canvas shadows={props.quality==="high"} dpr={props.quality==="high"?[1,1.5]:1} gl={{antialias:props.quality==="high",powerPreference:"high-performance",alpha:false}} camera={{near:.1,far:160}}><Scene {...props}/></Canvas>});
